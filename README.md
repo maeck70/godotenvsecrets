@@ -22,6 +22,16 @@ go get github.com/maeck70/godotenvsecrets
 
 ### Example
 
+Use a .env variable to set variables like the examples below, or simply set them with EXPORT FOO=BAR:
+
+``` bash
+EXPORT SERVICEACCOUNT1=@aws:dev/myproject:serviceaccount
+EXPORT SERVICEACCOUNT2=@aws:dev/myproject/serviceaccount
+EXPORT SERVICEACCOUNT3=@aws:dev/myproject/more:serviceaccount
+EXPORT SERVICEACCOUNT4=@azure:dev/myproject:serviceaccount
+EXPORT NOSECRET=IMNOTASECRET
+```
+
 ```go
 package main
 
@@ -35,7 +45,7 @@ func main() {
     if err != nil {
         fmt.Println("Error loading .env:", err)
     }
-    secret, err := godotenvsecrets.Getenv("@aws:dev/goenvsecrets:serviceaccount")
+    secret, err := godotenvsecrets.Getenv("@aws:dev/myproject:serviceaccount")
     if err != nil {
         fmt.Println("Error getting secret:", err)
     } else {
