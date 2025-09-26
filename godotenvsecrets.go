@@ -1,0 +1,114 @@
+package godotenvsecrets
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"log"
+	"os"
+	"regexp"
+	"strings"
+
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
+
+	"github.com/joho/godotenv"
+)
+
+var reEnvSecret *regexp.Regexp
+
+type secrets_t map[string]string
+
+func init() {
+	// Matches secrets like @aws:dev/goenvsecrets:serviceaccount, @aws:dev/goenvsecrets/serviceaccount, etc.
+	// Groups: provider, path, secret
+	reEnvSecret = regexp.MustCompile(`^@([a-zA-Z0-9]+):([a-zA-Z0-9\-/]+)[/:]([a-zA-Z0-9\-]+)$`)
+
+	/* Examples:
+	@aws:dev/goenvsecrets:serviceaccount = @aws dev/goenvsecrets serviceaccount
+	@aws:dev/goenvsecrets/serviceaccount = @aws dev/goenvsecrets serviceaccount
+	@aws:dev/goenvsecrets/more:serviceaccount = @aws dev/goenvsecrets/more serviceaccount
+	@azure:dev/goenvsecrets:serviceaccount = @azure dev/goenvsecrets serviceaccount
+	*/
+}
+
+func Load() error {
+	err := godotenv.Load()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func Getenv(envkey string) (string, error) {
+	if envkey[0] == '@' {
+		matches := reEnvSecret.FindStringSubmatch(envkey)
+		if len(matches) < 3 {
+			return "", fmt.Errorf("invalid secret format")
+		}
+		provider := matches[1]
+		secretName := matches[2]
+		secretKey := matches[3]
+
+		if envkey[0] == '@' {
+
+			switch strings.ToLower(provider) {
+			case "aws":
+				// Format: @aws:secret-name:secret-key
+				secretValue, err := awsDecodeSecret(secretName, secretKey)
+				return secretValue, err
+			default:
+				return "", fmt.Errorf("secrets provider not implemented")
+			}
+		} else {
+			return "", fmt.Errorf("invalid secret format")
+		}
+	}
+
+	return os.Getenv(envkey), nil
+}
+
+func awsDecodeSecret(secretName string, secretKey string) (string, error) {
+	region := os.Getenv("AWS_REGION")
+	if region == "" {
+		log.Fatal("AWS_REGION environment variable is not set")
+	}
+
+	config, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion(region))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Create Secrets Manager client
+	svc := secretsmanager.NewFromConfig(config)
+
+	input := &secretsmanager.GetSecretValueInput{
+		SecretId:     aws.String(secretName),
+		VersionStage: aws.String("AWSCURRENT"), // VersionStage defaults to AWSCURRENT if unspecified
+	}
+
+	result, err := svc.GetSecretValue(context.TODO(), input)
+	if err != nil {
+		// For a list of exceptions thrown, see
+		// https://docs.aws.amazon.com/secretsmanager/latest/apireference/API_GetSecretValue.html
+		log.Fatal(err.Error())
+	}
+
+	// Decrypts secret using the associated KMS key.
+	var secretString string = *result.SecretString
+
+	// Your code goes here.
+	secrets := make(secrets_t)
+	err = json.Unmarshal([]byte(secretString), &secrets)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	if _, ok := secrets[secretKey]; !ok {
+		return "", fmt.Errorf("secret key '%s' not found in secret '%s'", secretKey, secretName)
+	}
+
+	return secrets[secretKey], nil
+}
