@@ -30,6 +30,7 @@ func init() {
 	@aws:dev/goenvsecrets/serviceaccount = @aws dev/goenvsecrets serviceaccount
 	@aws:dev/goenvsecrets/more:serviceaccount = @aws dev/goenvsecrets/more serviceaccount
 	@azure:dev/goenvsecrets:serviceaccount = @azure dev/goenvsecrets serviceaccount
+	@env:ENVVARIABLE = @env ENVVARIABLE
 	*/
 }
 
@@ -59,8 +60,21 @@ func Getenv(envkey string) (string, error) {
 				// Format: @aws:secret-name:secret-key
 				secretValue, err := awsDecodeSecret(secretName, secretKey)
 				return secretValue, err
+			case "env":
+				// Format: @env:ENVVARIABLE
+				return os.Getenv(secretName), nil
+			// case "azure":
+			// 	// Implement Azure Key Vault retrieval here
+			// case: "gcp":
+			// 	// Implement Google Secret Manager retrieval here
+			// case "vault":
+			// 	// Implement HashiCorp Vault retrieval here
+			// case "k8s":
+			// 	// Implement Kubernetes Secrets retrieval here
+			// case "1password":
+			// 	// Implement 1Password retrieval here
 			default:
-				return "", fmt.Errorf("secrets provider not implemented")
+				return "", fmt.Errorf("secrets provider %s not implemented", provider)
 			}
 		} else {
 			return "", fmt.Errorf("invalid secret format")
