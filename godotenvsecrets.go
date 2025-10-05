@@ -23,7 +23,8 @@ type secrets_t map[string]string
 func init() {
 	// Matches secrets like @aws:dev/goenvsecrets:serviceaccount, @aws:dev/goenvsecrets/serviceaccount, etc.
 	// Groups: provider, path, secret
-	reEnvSecret = regexp.MustCompile(`^@([a-zA-Z0-9]+):([a-zA-Z0-9\-/]+)(?:[/:]([a-zA-Z0-9\-]+))?$`)
+	// reEnvSecret = regexp.MustCompile(`^@([a-zA-Z0-9]+):([a-zA-Z0-9\-/]+)(?:[/:]([a-zA-Z0-9\-]+))?$`)
+	reEnvSecret = regexp.MustCompile(`^@([a-zA-Z0-9_\-]+):([a-zA-Z0-9_\-/]+)(?:[/:]([a-zA-Z0-9_\-]+))?$`)
 
 	/* Examples:
 	@aws:dev/goenvsecrets:serviceaccount

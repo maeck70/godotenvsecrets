@@ -74,11 +74,20 @@ var testSet = []getenvTestCase{
 		getenvValue: "",
 		getenvErr:   fmt.Errorf("environment variable 'NOTINENV' not set"),
 	},
+	{
+		name:        "RabbitMQ Test",
+		loadErr:     nil,
+		getenvPath:  "@env:RABBITMQ_HOST",
+		getenvValue: "localhost",
+		getenvErr:   nil,
+	},
 }
 
 // Test each testSet case individually using the helper
 func TestGetenv_SingleCases(t *testing.T) {
 	os.Setenv("ENVVARIABLE", "IAmNotASecret")
+	os.Setenv("RABBITMQ_HOST", "localhost")
+
 	err := godotenv.Load()
 	if err != nil {
 		t.Fatalf("Failed to load .env: %v", err)
