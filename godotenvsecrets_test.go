@@ -2,20 +2,22 @@ package godotenvsecrets
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"testing"
 
 	"github.com/joho/godotenv"
 )
 
-var testSet = []struct {
+// Test case type for table-driven tests
+type getenvTestCase struct {
 	name        string
 	loadErr     error
 	getenvPath  string
 	getenvValue string
 	getenvErr   error
-}{
+}
+
+var testSet = []getenvTestCase{
 	{
 		name:        "AWS Service Account",
 		loadErr:     nil,
@@ -27,8 +29,8 @@ var testSet = []struct {
 		name:        "AWS Service Account",
 		loadErr:     nil,
 		getenvPath:  "@aws:dev/goenvsecrets/serviceaccount",
-		getenvValue: "marcel",
-		getenvErr:   nil,
+		getenvValue: "",
+		getenvErr:   fmt.Errorf("invalid secret format, missing secret key"),
 	},
 	{
 		name:        "AWS Secret Key",
@@ -49,7 +51,14 @@ var testSet = []struct {
 		loadErr:     nil,
 		getenvPath:  "@azure:dev/goenvsecrets:notimplemented",
 		getenvValue: "",
-		getenvErr:   fmt.Errorf("secrets provider not implemented"),
+		getenvErr:   fmt.Errorf("secrets provider azure not implemented"),
+	},
+	{
+		name:        "Env Var as a reference",
+		loadErr:     nil,
+		getenvPath:  "@env:ENVVARIABLE",
+		getenvValue: "IAmNotASecret",
+		getenvErr:   nil,
 	},
 	{
 		name:        "Straight up Env Var",
@@ -58,34 +67,53 @@ var testSet = []struct {
 		getenvValue: "IAmNotASecret",
 		getenvErr:   nil,
 	},
+	{
+		name:        "Non set Env Var",
+		loadErr:     nil,
+		getenvPath:  "NOTINENV",
+		getenvValue: "",
+		getenvErr:   fmt.Errorf("environment variable 'NOTINENV' not set"),
+	},
 }
 
-// Table-driven test for Getenv using testSet
-func TestGetenv_TableDriven(t *testing.T) {
-	// Set up environment variable for "Straight up Env Var" test
+// Test each testSet case individually using the helper
+func TestGetenv_SingleCases(t *testing.T) {
 	os.Setenv("ENVVARIABLE", "IAmNotASecret")
-
 	err := godotenv.Load()
 	if err != nil {
-		log.Fatal(err)
-		return
+		t.Fatalf("Failed to load .env: %v", err)
 	}
 
 	for _, tc := range testSet {
 		t.Run(tc.name, func(t *testing.T) {
-			got, err := Getenv(tc.getenvPath)
-			if tc.getenvErr != nil {
-				if err == nil || err.Error() != tc.getenvErr.Error() {
-					t.Errorf("Expected error '%v', got '%v'", tc.getenvErr, err)
-				}
-			} else {
-				if err != nil {
-					t.Errorf("Unexpected error: %v", err)
-				}
-				if got != tc.getenvValue {
-					t.Errorf("Expected value '%s', got '%s'", tc.getenvValue, got)
-				}
-			}
+			runTestSetCase(t, tc)
 		})
+	}
+}
+
+// Helper to run a single test case from testSet
+func runTestSetCase(t *testing.T, tc getenvTestCase) {
+	var errStr, getEnvErrStr string
+
+	got, err := Getenv(tc.getenvPath)
+
+	if err != nil {
+		errStr = err.Error()
+	} else {
+		errStr = ""
+	}
+
+	if tc.getenvErr != nil {
+		getEnvErrStr = tc.getenvErr.Error()
+	} else {
+		getEnvErrStr = ""
+	}
+
+	if getEnvErrStr != errStr {
+		t.Errorf("Expected error '%v', got '%v'", tc.getenvErr, err)
+	}
+
+	if got != tc.getenvValue {
+		t.Errorf("Expected value '%s', got '%s'", tc.getenvValue, got)
 	}
 }

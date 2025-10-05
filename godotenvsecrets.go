@@ -23,13 +23,13 @@ type secrets_t map[string]string
 func init() {
 	// Matches secrets like @aws:dev/goenvsecrets:serviceaccount, @aws:dev/goenvsecrets/serviceaccount, etc.
 	// Groups: provider, path, secret
-	reEnvSecret = regexp.MustCompile(`^@([a-zA-Z0-9]+):([a-zA-Z0-9\-/]+)[/:]([a-zA-Z0-9\-]+)$`)
+	reEnvSecret = regexp.MustCompile(`^@([a-zA-Z0-9]+):([a-zA-Z0-9\-/]+)(?:[/:]([a-zA-Z0-9\-]+))?$`)
 
 	/* Examples:
-	@aws:dev/goenvsecrets:serviceaccount = @aws dev/goenvsecrets serviceaccount
-	@aws:dev/goenvsecrets/serviceaccount = @aws dev/goenvsecrets serviceaccount
-	@aws:dev/goenvsecrets/more:serviceaccount = @aws dev/goenvsecrets/more serviceaccount
-	@azure:dev/goenvsecrets:serviceaccount = @azure dev/goenvsecrets serviceaccount
+	@aws:dev/goenvsecrets:serviceaccount
+	@aws:dev/goenvsecrets/serviceaccount
+	@aws:dev/goenvsecrets/more:serviceaccount
+	@azure:dev/goenvsecrets:serviceaccount
 	@env:ENVVARIABLE = @env ENVVARIABLE
 	*/
 }
@@ -44,18 +44,32 @@ func Load() error {
 }
 
 func Getenv(envkey string) (string, error) {
+	var secretName string
+	var secretKey string
+
 	if envkey[0] == '@' {
 		matches := reEnvSecret.FindStringSubmatch(envkey)
-		if len(matches) < 3 {
-			return "", fmt.Errorf("invalid secret format")
+
+		provider := strings.ToLower(matches[1])
+
+		switch provider {
+		case "aws":
+			secretName = matches[2]
+			secretKey = matches[3]
+			if secretKey == "" {
+				return "", fmt.Errorf("invalid secret format, missing secret key")
+			}
+
+		case "env":
+			secretName = matches[2]
+
+		default:
+			return "", fmt.Errorf("secrets provider %s not implemented", provider)
 		}
-		provider := matches[1]
-		secretName := matches[2]
-		secretKey := matches[3]
 
 		if envkey[0] == '@' {
 
-			switch strings.ToLower(provider) {
+			switch provider {
 			case "aws":
 				// Format: @aws:secret-name:secret-key
 				secretValue, err := awsDecodeSecret(secretName, secretKey)
@@ -76,12 +90,15 @@ func Getenv(envkey string) (string, error) {
 			default:
 				return "", fmt.Errorf("secrets provider %s not implemented", provider)
 			}
-		} else {
-			return "", fmt.Errorf("invalid secret format")
 		}
 	}
 
-	return os.Getenv(envkey), nil
+	secretValue := os.Getenv(envkey)
+	if secretValue == "" {
+		return "", fmt.Errorf("environment variable '%s' not set", envkey)
+	}
+
+	return secretValue, nil
 }
 
 func awsDecodeSecret(secretName string, secretKey string) (string, error) {
