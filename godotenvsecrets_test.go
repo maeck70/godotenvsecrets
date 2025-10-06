@@ -81,6 +81,13 @@ var testSet = []getenvTestCase{
 		getenvValue: "localhost",
 		getenvErr:   nil,
 	},
+	{
+		name:        "RabbitMQ Test",
+		loadErr:     nil,
+		getenvPath:  "@env:RABBITMQ=HOST",
+		getenvValue: "",
+		getenvErr:   fmt.Errorf("invalid secret format, invalid characters (allowed: a-z A-Z 0-9 _ -) or structure"),
+	},
 }
 
 // Test each testSet case individually using the helper

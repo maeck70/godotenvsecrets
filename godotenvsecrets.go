@@ -51,6 +51,10 @@ func Getenv(envkey string) (string, error) {
 	if envkey[0] == '@' {
 		matches := reEnvSecret.FindStringSubmatch(envkey)
 
+		if len(matches) == 0 {
+			return "", fmt.Errorf("invalid secret format, invalid characters (allowed: a-z A-Z 0-9 _ -) or structure")
+		}
+
 		provider := strings.ToLower(matches[1])
 
 		switch provider {
