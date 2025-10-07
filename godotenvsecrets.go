@@ -129,6 +129,7 @@ func awsDecodeSecret(secretName string, secretKey string) (any, error) {
 		return "", fmt.Errorf("secret key '%s' not found in cached secret '%s'", secretKey, secretName)
 	}
 
+	fmt.Printf("Getting secret from aws: @aws:%s:%s\n", secretName, secretKey)
 	cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion(region))
 	if err != nil {
 		log.Fatal(err)
