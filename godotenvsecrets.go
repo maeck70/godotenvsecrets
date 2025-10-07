@@ -16,9 +16,11 @@ import (
 	"github.com/joho/godotenv"
 )
 
-var reEnvSecret *regexp.Regexp
+type kv_t map[string]string
+type secrets_t map[string]interface{}
 
-type secrets_t map[string]string
+var reEnvSecret *regexp.Regexp
+var awsCache kv_t = make(kv_t)
 
 func init() {
 	// Matches secrets like @aws:dev/goenvsecrets:serviceaccount, @aws:dev/goenvsecrets/serviceaccount, etc.
@@ -44,7 +46,7 @@ func Load() error {
 	return nil
 }
 
-func Getenv(envkey string) (string, error) {
+func Getenv(envkey string) (any, error) {
 	var secretName string
 	var secretKey string
 
@@ -61,6 +63,7 @@ func Getenv(envkey string) (string, error) {
 		case "aws":
 			secretName = matches[2]
 			secretKey = matches[3]
+
 			if secretKey == "" {
 				return "", fmt.Errorf("invalid secret format, missing secret key")
 			}
@@ -106,45 +109,56 @@ func Getenv(envkey string) (string, error) {
 	return secretValue, nil
 }
 
-func awsDecodeSecret(secretName string, secretKey string) (string, error) {
+func awsDecodeSecret(secretName string, secretKey string) (any, error) {
 	region := os.Getenv("AWS_REGION")
 	if region == "" {
 		log.Fatal("AWS_REGION environment variable is not set")
 	}
 
-	config, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion(region))
+	// Check cache first
+	if cached, ok := awsCache[secretName]; ok {
+		var secrets secrets_t
+		err := json.Unmarshal([]byte(cached), &secrets)
+		if err != nil {
+			return "", fmt.Errorf("failed to unmarshal cached secret: %v", err)
+		}
+		if val, ok := secrets[secretKey]; ok {
+			fmt.Println("Found in cache:", val)
+			return val, nil
+		}
+		return "", fmt.Errorf("secret key '%s' not found in cached secret '%s'", secretKey, secretName)
+	}
+
+	cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion(region))
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	// Create Secrets Manager client
-	svc := secretsmanager.NewFromConfig(config)
+	svc := secretsmanager.NewFromConfig(cfg)
 
 	input := &secretsmanager.GetSecretValueInput{
 		SecretId:     aws.String(secretName),
-		VersionStage: aws.String("AWSCURRENT"), // VersionStage defaults to AWSCURRENT if unspecified
+		VersionStage: aws.String("AWSCURRENT"),
 	}
 
 	result, err := svc.GetSecretValue(context.TODO(), input)
 	if err != nil {
-		// For a list of exceptions thrown, see
-		// https://docs.aws.amazon.com/secretsmanager/latest/apireference/API_GetSecretValue.html
 		log.Fatal(err.Error())
 	}
 
-	// Decrypts secret using the associated KMS key.
-	var secretString string = *result.SecretString
+	secretString := *result.SecretString
 
-	// Your code goes here.
+	// Cache the raw secret string for future lookups
+	awsCache[secretName] = secretString
+
 	secrets := make(secrets_t)
 	err = json.Unmarshal([]byte(secretString), &secrets)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	if _, ok := secrets[secretKey]; !ok {
-		return "", fmt.Errorf("secret key '%s' not found in secret '%s'", secretKey, secretName)
+	if val, ok := secrets[secretKey]; ok {
+		return val, nil
 	}
-
-	return secrets[secretKey], nil
+	return "", fmt.Errorf("secret key '%s' not found in secret '%s'", secretKey, secretName)
 }

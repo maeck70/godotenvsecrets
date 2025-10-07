@@ -44,7 +44,7 @@ var testSet = []getenvTestCase{
 		loadErr:     nil,
 		getenvPath:  "@aws:dev/goenvsecrets:idonotexist",
 		getenvValue: "",
-		getenvErr:   fmt.Errorf("secret key '%s' not found in secret '%s'", "idonotexist", "dev/goenvsecrets"),
+		getenvErr:   fmt.Errorf("secret key '%s' not found in cached secret '%s'", "idonotexist", "dev/goenvsecrets"),
 	},
 	{
 		name:        "Azure Not Implemented",
