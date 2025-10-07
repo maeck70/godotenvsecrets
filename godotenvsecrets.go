@@ -123,7 +123,7 @@ func awsDecodeSecret(secretName string, secretKey string) (any, error) {
 			return "", fmt.Errorf("failed to unmarshal cached secret: %v", err)
 		}
 		if val, ok := secrets[secretKey]; ok {
-			fmt.Println("Found in cache:", val)
+			fmt.Printf("Found in cache: @aws:%s:%s\n", secretName, secretKey)
 			return val, nil
 		}
 		return "", fmt.Errorf("secret key '%s' not found in cached secret '%s'", secretKey, secretName)
