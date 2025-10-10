@@ -88,6 +88,13 @@ var testSet = []getenvTestCase{
 		getenvValue: "",
 		getenvErr:   fmt.Errorf("invalid secret format, invalid characters (allowed: a-z A-Z 0-9 _ -) or structure"),
 	},
+	// {
+	// 	name:        "Azure mysql password test",
+	// 	loadErr:     nil,
+	// 	getenvPath:  "@azure:mysql",
+	// 	getenvValue: "hello",
+	// 	getenvErr:   nil,
+	// },
 }
 
 // Test each testSet case individually using the helper
